@@ -62,7 +62,7 @@ process Prepare_input {
 /* The resulting tables are split in rows */
 gridss_ids
     .splitCsv(sep:'\t', header: true)
-    .map{ row-> tuple(row.normalSample, row.patient, row.Bams)}
+    .map{ row-> tuple(row.normalSample, row.patient, row.bams)}
     .set{ gridss_input }
 
 /* Structural variant caller: GRIDSS*/
@@ -78,7 +78,7 @@ process Gridss {
     val ref_genome_fa
     file bk_bed
     val pubDir
-    tuple normalSample, patient, Bams from gridss_input
+    tuple normalSample, patient, bams from gridss_input
 
     output:
     tuple path("${normalSample}_calls.vcf"), val(normalSample) into gridss_output
@@ -87,22 +87,38 @@ process Gridss {
     """
     export PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin/:\$PATH
 
+    #GRIDSS process
     /opt/share/gridss-2.13.2/gridss \
     -r $ref_genome_fa \
     -j  /opt/share/gridss-2.13.2/gridss-2.13.2-gridss-jar-with-dependencies.jar \
     -o ${normalSample}_calls.vcf \
     -b $bk_bed \
-    ${Bams}
+    ${bams}
+
+    #copy in PoN directory
+    ln -s $pubDir/${patient}/${normalSample}_calls.vcf $pubDir/PoN/${normalSample}_calls.vcf
+
+    #create compressed version and index file
+    bcftools view $pubDir/${patient}/${normalSample}_calls.vcf -Oz -o $pubDir/${patient}/${normalSample}_calls.vcf.gz
+    bcftools index $pubDir/${patient}/${normalSample}_calls.vcf.gz -t -o $pubDir/${patient}/${normalSample}_calls.vcf.gz.tbi
+
+    #modify header and create the new version of vcf.gz
+    bcftools view -h $pubDir/${patient}/${normalSample}_calls.vcf.gz | sed 's/.bam//g' > header.vcf
+    bcftools view -H $pubDir/${patient}/${normalSample}_calls.vcf.gz -o body.vcf
+    cat header.vcf body.vcf | bcftools view -Oz -o $pubDir/${patient}/${normalSample}_calls_modified.vcf.gz
+
+    #remove header and body
+    rm header.vcf
+    rm body.vcf
     """
 }
 
-gridss_output
-    .into{
-        gridss_for_pon;
-        gridss_rest
-    }
+gridss_output.into{
+    gridss_pon;
+    gridss_rest
+}
 
-gridss_for_pon.map { it.first() }
+gridss_pon.map { it.first() }
     .collect()
     .set{ pon_input }
 
@@ -114,7 +130,7 @@ process Pon {
     val pon_breakpoint
     val pubDir
     val ref_genome_fa
-    path("${normalSample}_calls.vcf") from pon_input
+    path("*") from pon_input
 
     output:
     path("gridss_pon_breakpoint.bedpe") into pon_bedpe
@@ -125,7 +141,7 @@ process Pon {
     java -Xmx8g \
 	-cp /opt/share/gridss-2.13.2/gridss-2.13.2-gridss-jar-with-dependencies.jar \
 	gridss.GeneratePonBedpe \
-	\$(ls -1 *.vcf | awk ' { print "INPUT=" \$0 }' | head -\$n) \
+    \$(ls -1 $pubDir/PoN/*.vcf | awk ' { print "INPUT=" \$0 }' | head -\$n) \
 	INPUT_BEDPE= $pon_breakpoint \
 	INPUT_BED= $pon_breakend \
 	O=gridss_pon_breakpoint.bedpe \
@@ -136,8 +152,8 @@ process Pon {
 }
 
 sample_ids
-    .splitCsv(sep:'\t', header: ['sample_id', 'normalSample', 'bam_sample', 'bam_normal', 'patient'], skip: 1)
-    .map{ row-> tuple(row.sample_id, row.normalSample, row.bam_sample, row.bam_normal, row.patient)}    
+    .splitCsv(sep:'\t', header: ['sample', 'normalSample', 'bamFile', 'normalBamFile', 'patient'], skip: 1)
+    .map{ row-> tuple(row.sample, row.normalSample, row.bamFile, row.normalBamFile, row.patient)}    
     .into{
         sample_info_split_gripss;
         sample_info_split_Amber;
@@ -162,23 +178,23 @@ process Gripss {
     val ref_genome_fa
     path("gridss_pon_breakpoint.bedpe") from pon_bedpe
     path("gridss_pon_single_breakend.bed") from pon_bed 
-    tuple normalSample, sample_id, bam_sample, bam_normal, patient, path("${normalSample}_calls.vcf") from gripss_input
+    tuple normalSample, sample, bamFile, normalBamFile, patient, path("${normalSample}_calls.vcf") from gripss_input
 
     output:
-    tuple val(sample_id), 
-        path("${sample_id}.gripss.vcf.gz"), path("${sample_id}.gripss.vcf.gz.tbi") into gripss_result_ch
-    tuple val(sample_id), 
-        path("${sample_id}.gripss.filtered.vcf.gz"), path("${sample_id}.gripss.filtered.vcf.gz.tbi") into gripss_filtered_ch
+    tuple val(sample), 
+        path("${sample}.gripss.vcf.gz"), path("${sample}.gripss.vcf.gz.tbi") into gripss_result_ch
+    tuple val(sample), 
+        path("${sample}.gripss.filtered.vcf.gz"), path("${sample}.gripss.filtered.vcf.gz.tbi") into gripss_filtered_ch
     
     script:
     """
     $java -jar /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/gripss.jar \
-        -sample  ${sample_id}\
+        -sample  ${sample}\
         -reference ${normalSample} \
         -ref_genome $ref_genome_fa \
         -pon_sgl_file gridss_pon_single_breakend.bed \
         -pon_sv_file gridss_pon_breakpoint.bedpe \
-        -vcf ${normalSample}_calls.vcf \
+        -vcf $pubDir/${patient}/${normalSample}_calls.vcf.gz \
         -output_dir .
     """
 }
@@ -195,18 +211,18 @@ process Cobalt {
     val ref_genome_fa
     val gc_profile
     val pubDir
-    tuple sample_id, normalSample, bam_sample, bam_normal, patient from sample_info_split_Cobalt
+    tuple sample, normalSample, bamFile, normalBamFile, patient from sample_info_split_Cobalt
 
     output:
-    tuple val(sample_id), path("*") into cobalt_output_ch
+    tuple val(sample), path("*") into cobalt_output_ch
 
     script:
     """
     $java -Xmx8g -cp /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/cobalt.jar com.hartwig.hmftools.cobalt.CobaltApplication \
     -reference ${normalSample} \
-    -reference_bam ${bam_normal} \
-    -tumor ${sample_id} \
-    -tumor_bam ${bam_sample} \
+    -reference_bam ${normalBamFile} \
+    -tumor ${sample} \
+    -tumor_bam ${bamFile} \
     -output_dir . \
     -threads 4 \
     -ref_genome $ref_genome_fa \
@@ -224,18 +240,18 @@ process Amber {
     val pubDir
     val java
     val loci_path
-    tuple sample_id, normalSample, bam_sample, bam_normal, patient from sample_info_split_Amber
+    tuple sample, normalSample, bamFile, normalBamFile, patient from sample_info_split_Amber
 
     output:
-    tuple val(sample_id), path("*") into amber_result_ch
+    tuple val(sample), path("*") into amber_result_ch
 
     script:
     """
     $java -Xmx32g -cp /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/amber.jar com.hartwig.hmftools.amber.AmberApplication \
     -reference ${normalSample} \
-    -reference_bam ${bam_normal} \
-    -tumor ${sample_id} \
-    -tumor_bam ${bam_sample} \
+    -reference_bam ${normalBamFile} \
+    -tumor ${sample} \
+    -tumor_bam ${bamFile} \
     -output_dir . \
     -ref_genome_version 38 \
     -threads 4 \
@@ -253,6 +269,7 @@ sample_info_split_Purple.join(gripss_result_ch)
 /* Ploidy and Purity estimation: Purple */
 process Purple {
     cpus 2
+    memory '32 GB'
     publishDir "$pubDir/${patient}", mode: "copy"
 
     input:
@@ -266,9 +283,9 @@ process Purple {
     val driver_catalog
     val germline_hs
     val somatic_hs
-    tuple   sample_id, normalSample, bam_sample, bam_normal, patient, /* output from the sample information table */
-            path("${sample_id}.gripss.vcf.gz"), path("${sample_id}.gripss.vcf.gz.tbi"),  /* soft-filtered SVs from gripss */
-            path("${sample_id}.gripss.filtered.vcf.gz"), path("${sample_id}.gripss.filtered.vcf.gz.tbi"), /* hard-filtered SVs from gripss */
+    tuple   sample, normalSample, bamFile, normalBamFile, patient, /* output from the sample information table */
+            path("${sample}.gripss.vcf.gz"), path("${sample}.gripss.vcf.gz.tbi"),  /* soft-filtered SVs from gripss */
+            path("${sample}.gripss.filtered.vcf.gz"), path("${sample}.gripss.filtered.vcf.gz.tbi"), /* hard-filtered SVs from gripss */
             path("${patient}/*"), /* output from amber */
             path("${patient}/*") from purpleInput /* output from cobalt */
     
@@ -279,15 +296,14 @@ process Purple {
     """
     $java -jar /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/purple_v3.7.2.jar \
     -reference ${normalSample} \
-    -tumor ${sample_id} \
+    -tumor ${sample} \
     -amber ${patient} \
     -cobalt ${patient} \
     -gc_profile $gc_profile \
     -ref_genome $ref_genome_fa \
     -ensembl_data_dir $ensembl_dir \
-    -structural_vcf ${sample_id}.gripss.filtered.vcf.gz \
-    -sv_recovery_vcf ${sample_id}.gripss.vcf.gz \
-    -germline_vcf $germline_data/${patient}.vcf.gz \
+    -structural_vcf ${sample}.gripss.filtered.vcf.gz \
+    -sv_recovery_vcf ${sample}.gripss.vcf.gz \
     -somatic_vcf $somatic_data/${patient}.vcf.gz \
     -run_drivers \
     -driver_gene_panel $driver_catalog \
