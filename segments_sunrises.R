@@ -176,7 +176,7 @@ for (i in 2:nrow(samplesReady)) {
 all_segs <- all_segs %>%
   inner_join(samplesReady) %>%  
   mutate(length = end - start,
-         logR = ifelse(copyNumber<=0, -12, log(copyNumber/ploidy)),
+         logR = ifelse(copyNumber<=0, -10, log(copyNumber/ploidy)),
          Loh = abs(baf - 0.5) * 2 * length / ifelse(is.na(baf), 0, length)) %>%
   dplyr::select(sample, patient, chromosome, start, end, length, 4:16, 19:20, 24:5)
 
