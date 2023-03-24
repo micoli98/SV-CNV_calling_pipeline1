@@ -123,30 +123,36 @@ arg <- commandArgs(trailingOnly = TRUE)
 sample_info<-suppressMessages(read_tsv(arg[1]))
 publishDir <- arg[2]
 
+#Filtering for usable samples
+samples_filtered <- sample_info %>%
+  filter(usable==T) %>%
+  filter(contamFilter == F) %>%
+  filter(sampleType=="fresh frozen" | sampleType=="blood") 
+samples_filtered <- samples_filtered[!is.na(samples_filtered$normalSample),] 
 
 # Selection of sample ids and patients of tumor samples 
-sample_info <- sample_info %>%
-  dplyr::filter(normal=="FALSE") %>%
+real_normals <- samples_filtered[, "variantCallingNormalSample"] %>% unique() %>% as.list()
+
+samples_filtered <- samples_filtered %>%
+  filter(!(sample %in% real_normals$variantCallingNormalSample)) %>%
   dplyr::select(sample, patient)
 
 # Retrieve purity and ploidy values from purple results
-sample_info$ploidy <- 0
-sample_info$purity <- 0
-sample_info$score <- 0
-for (i in 1:nrow(sample_info)) {
-  sample <- sample_info[[i, 1]]
-  patient <- sample_info[[i, 2]]
+samples_filtered$ploidy <- 0
+samples_filtered$purity <- 0
+for (i in 1:nrow(samples_filtered)) {
+  sample <- samples_filtered[[i, 1]]
+  patient <- samples_filtered[[i, 2]]
   file <- paste0(publishDir, "/", patient, "/", sample, ".purple.purity.tsv")
   if (file.exists(file) == TRUE) {
     pur_pl <-read_tsv(file, show_col_types = FALSE)
-    sample_info[i, 3] <- pur_pl[[1, 5]]
-    sample_info[i, 4] <- pur_pl[[1, 1]]
-    sample_info[i, 5] <- pur_pl[[1, 3]]
+    samples_filtered[i, 3] <- pur_pl[[1, 5]]
+    samples_filtered[i, 4] <- pur_pl[[1, 1]]
   }
 }
 # Check for completed samples
-sample_info <- sample_info %>% mutate(sum = rowSums(.[3:5]))
-samplesReady <- subset(sample_info, sum!=0)
+samples_filtered <- samples_filtered %>% mutate(sum = rowSums(.[3:4]))
+samplesReady <- subset(samples_filtered, sum!=0)
 
 # Join all segments retrieved from PURPLE results
 sample1 <- samplesReady[[1,1]]
@@ -170,7 +176,7 @@ for (i in 2:nrow(samplesReady)) {
 all_segs <- all_segs %>%
   inner_join(samplesReady) %>%  
   mutate(length = end - start,
-         logR = log(ifelse(copyNumber<0, 0, copyNumber/ploidy)),
+         logR = ifelse(copyNumber<=0, -12, log(copyNumber/ploidy)),
          Loh = abs(baf - 0.5) * 2 * length / ifelse(is.na(baf), 0, length)) %>%
   dplyr::select(sample, patient, chromosome, start, end, length, 4:16, 19:20, 24:5)
 
@@ -182,14 +188,14 @@ all_candidates <- as.data.frame(matrix(ncol=5, nrow=0))
 dir.create(paste0(publishDir, "/surnrises"))
 
 for (i in 1:nrow(samplesReady)) {
-  sample <- sample_info[i, 1]
-  patient <- sample_info[i, 2]
+  sample <- samples_filtered[i, 1]
+  patient <- samples_filtered[i, 2]
   purpleDir <- paste0(publishDir, "/", patient)
-  #bestFitDF = read.table(file = paste0(purpleDir, "/", sample, ".purple.purity.tsv"), sep = "\t", header = T, comment.char = "!") %>% dplyr::select(purity, ploidy, score)
-  #rangeDF = read.table(file = paste0(purpleDir, "/", sample, ".purple.purity.range.tsv"), sep = "\t", header = T, comment.char = "!") %>%
-  #  dplyr::select(purity, ploidy, score)
-  #rangePlot = purity_ploidy_range_plot(bestFitDF, rangeDF)
-  #ggsave(filename = paste0(sample, ".purity.range.png"), rangePlot, path = paste0(publishDir, "/sunrises/"), units = "in", height = 4, width = 4.8, scale = 1)
+  bestFitDF = read.table(file = paste0(purpleDir, "/", sample, ".purple.purity.tsv"), sep = "\t", header = T, comment.char = "!") %>% dplyr::select(purity, ploidy, score)
+  rangeDF = read.table(file = paste0(purpleDir, "/", sample, ".purple.purity.range.tsv"), sep = "\t", header = T, comment.char = "!") %>%
+    dplyr::select(purity, ploidy, score)
+  rangePlot = purity_ploidy_range_plot(bestFitDF, rangeDF)
+  ggsave(filename = paste0(sample, ".purity.range.png"), rangePlot, path = paste0(publishDir, "/sunrises/"), units = "in", height = 4, width = 4.8, scale = 1)
   
   file <- paste0(purpleDir, "/", sample, ".purple.somatic.hist.tsv")
   if (file.exists(file) == TRUE) 
