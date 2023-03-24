@@ -9,51 +9,54 @@ arg <- commandArgs(trailingOnly = TRUE)
 #proj_dir <- "/Users/micoli/mnt/storageBig8/work/micoli/051122/"
 
 samples <- read_tsv(arg[1], show_col_types = FALSE)
-samples$normalSample<-replace_na(samples$normalSample, "unknown")
 proj_dir <- arg[2]
 
+#Filtering step
+#Filtering out: 
+#-non usable sample
+#-contaminated samples
+#-not fresh-frozen samples
+#-normalSample is not NA
+
+samples_filtered <- samples %>%
+  filter(usable==T) %>%
+  filter(contamFilter == F) %>%
+  filter(sampleType=="fresh frozen" | sampleType=="blood") 
+
+samples_filtered <- samples_filtered[!is.na(samples_filtered$normalSample),] 
+
 # File for all tools
-ids_table <- samples %>%
+ids_table <- samples_filtered %>%
   filter(normal!=TRUE) %>%
-  select(sample, normalSample, bamFile, normalBamFile, patient) %>%
-  drop_na()
+  select(sample, variantCallingNormalSample, bamFile, variantCallingNormalBamFile, patient)
+
+colnames(ids_table) <- c("sample", "normalSample", "bamFile", "normalBamFile", "patient")
 write_tsv(ids_table, "ids_table.tsv")
 
 # Prepare file for GRIDSS: normal and all tumor bams related and put in line
 # Select the non-processed samples
-normal_samples <- samples[samples$normal==TRUE,]
-gridss_input <- normal_samples[,c(1, 2, 13)]
+normal_samples <- samples_filtered[samples_filtered$normal==TRUE,]
+gridss_input <- normal_samples[,c(17, 2, 18)] %>% unique()
 
 gridss_input$tumorBam <- ""
-for (i in gridss_input$sample) {
+for (i in gridss_input$variantCallingNormalSample) {
   j <- NULL
-  j <- as.data.frame(cbind(j, ifelse(samples$normalSample == i & samples$normal == "FALSE", samples$bamFile, NA))) %>%
+  #select the bam files of the samples to process for each variantCallingNormalSample (the second conditions allows to include also normals with different platform)
+  j <- as.data.frame(cbind(j, ifelse((samples_filtered$variantCallingNormalSample == i & samples_filtered$sample!=samples_filtered$variantCallingNormalSample), samples_filtered$bamFile, NA))) %>%
     na.omit(j)
   j<- toString(c(j$V1[1:nrow(j)]))
   j<- str_remove_all(j, ",")
   
-  gridss_input$tumorBam <- ifelse(gridss_input$sample == i, j, gridss_input$tumorBam)
+  gridss_input$tumorBam <- ifelse(gridss_input$variantCallingNormalSample == i, j, gridss_input$tumorBam)
 }
 
-gridss_input <- gridss_input[order(gridss_input$sample),] %>% as.data.frame()
+colnames(gridss_input) <- c("normalSample", "patient", "bamFile", "tumorBam")
+gridss_input <- gridss_input[order(gridss_input$normalSample),] %>% as.data.frame()
 gridss_input$tumorBam <- str_replace(gridss_input$tumorBam, "^NA$", "")
 
-#The samples which have a different normal (different platforms) but belong to the same patient are joined together to 
-#increase the power of the joint calling
-duplicato<- gridss_input[duplicated(gridss_input$patient),] #Other platform samples
-true_normal <- gridss_input[!duplicated(gridss_input$patient),]  #Normal BDNA 
-duplicato <- duplicato %>% unite("Bams", bamFile:tumorBam, sep=" ", remove = FALSE) %>% select(patient, Bams)
+#collapse bams in a single column "Bams"
+gridss_input <- gridss_input %>% unite("bams", bamFile:tumorBam, sep=" ", remove = FALSE) %>% select(normalSample, patient, bams)
 
-#If there are patients with multiple normal Bams they are joined to the true normal BDNA
-
-dup_merged <- duplicato %>% 
-  group_by(patient) %>% 
-  summarise(Bams_all=paste(Bams, collapse=" "))
-
-joined <- full_join(true_normal, dup_merged)
-joined$Bams_all <- replace_na(joined$Bams_all, "")
-joined <- joined %>% unite("all_bams", bamFile:Bams_all, sep=" ", remove = FALSE) %>% select(sample, patient, all_bams)
-colnames(joined)<- c("normalSample", "patient", "Bams")
-write_tsv(joined, "gridss_input.tsv", na = "")
+write_tsv(gridss_input, "gridss_input.tsv", na = "")
 
 

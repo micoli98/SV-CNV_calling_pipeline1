@@ -294,7 +294,7 @@ process Purple {
 
     script:
     """
-    $java -jar /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/purple_v3.7.2.jar \
+    $java -Xmx32g -jar /mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/purple_v3.7.2.jar \
     -reference ${normalSample} \
     -tumor ${sample} \
     -amber ${patient} \
@@ -304,6 +304,7 @@ process Purple {
     -ensembl_data_dir $ensembl_dir \
     -structural_vcf ${sample}.gripss.filtered.vcf.gz \
     -sv_recovery_vcf ${sample}.gripss.vcf.gz \
+    -gemline_vcf $germline_data/${patient}.vcf.gz \
     -somatic_vcf $somatic_data/${patient}.vcf.gz \
     -run_drivers \
     -driver_gene_panel $driver_catalog \
