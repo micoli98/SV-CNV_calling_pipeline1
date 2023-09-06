@@ -96,7 +96,7 @@ process Gridss {
     ${bams}
 
     #copy in PoN directory
-    ln -s $pubDir/${patient}/${normalSample}_calls.vcf $pubDir/PoN/${normalSample}_calls.vcf
+    ln -sf $pubDir/${patient}/${normalSample}_calls.vcf $pubDir/PoN/${normalSample}_calls.vcf
 
     #create compressed version and index file
     bcftools view $pubDir/${patient}/${normalSample}_calls.vcf -Oz -o $pubDir/${patient}/${normalSample}_calls.vcf.gz
