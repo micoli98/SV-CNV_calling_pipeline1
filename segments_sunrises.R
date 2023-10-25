@@ -16,7 +16,7 @@ suppressMessages({
   library(ggfx)
   library(tidyverse)
 })
-source("/mnt/storageBig8/work/micoli/pipeline/Scripts_Dependencies/functions_plots.R")
+source("/mnt/storageBig8/work/micoli/SCNA_Purple/src/functions_plots.R")
 theme_set(theme_bw())
 
 #### Candidates table
@@ -85,11 +85,16 @@ write_tsv(all_segs, paste0(publishDir, "/segmentation_info_final.tsv"))
 
 ##### Sunrise and subclonal plots
 for (i in 1:nrow(samples_filtered)) {
-  bestFitDF = read.table(file = paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.purity.tsv"), sep = "\t", header = T, comment.char = "!") %>% dplyr::select(purity, ploidy, score)
-  rangeDF = read.table(file = paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.purity.range.tsv"), sep = "\t", header = T, comment.char = "!") %>%
-    dplyr::select(purity, ploidy, score)
-  rangePlot = purity_ploidy_range_plot(bestFitDF, rangeDF)
-  ggsave(filename = paste0(samples_filtered[i, "sample"], ".purity.range.png"), rangePlot, path = paste0("~/Desktop/surnrises"), units = "in", height = 4, width = 4.8, scale = 1)
+  bestFitFile <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.purity.tsv")
+  rangeFile <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.purity.range.tsv")
+  if (file.exists(bestFitFile) && file.exists(rangeFile))
+  {
+    bestFitDF = read.table(file = bestFitFile, sep = "\t", header = T, comment.char = "!") %>% dplyr::select(purity, ploidy, score)
+    rangeDF = read.table(file = rangeFile, sep = "\t", header = T, comment.char = "!") %>%
+      dplyr::select(purity, ploidy, score)
+    rangePlot = purity_ploidy_range_plot(bestFitDF, rangeDF)
+    ggsave(filename = paste0(samples_filtered[i, "sample"], ".purity.range.png"), rangePlot, path = paste0("~/Desktop/surnrises"), units = "in", height = 4, width = 4.8, scale = 1)
+  }
   
   file <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.somatic.hist.tsv")
   if (file.exists(file) == TRUE)
@@ -101,3 +106,4 @@ for (i in 1:nrow(samples_filtered)) {
     ggsave(filename = paste0(samples_filtered[i, "sample"], ".somatic.clonality.png"), clonalityModelPlot, path = paste0("~/Desktop/surnrises"), units = "in", height = 6, width = 8, scale = 1)
   }
 }
+
