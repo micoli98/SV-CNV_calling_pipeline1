@@ -5,10 +5,10 @@ suppressMessages({
   library(readr)})
 
 arg <- commandArgs(trailingOnly = TRUE)
-#arg <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_test.csv"
-#proj_dir <- "/Users/micoli/mnt/storageBig8/work/micoli/051122/"
-#old_sample_info <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_extended_221206.csv"
-#new_sample_info <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_extended_231004.csv"
+# arg <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_test.csv"
+# proj_dir <- "/Users/micoli/mnt/storageBig8/work/micoli/051122/"
+# old_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_231004.csv"
+# new_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources//sample_info_extended_240617.csv"
 
 new_samples <- read.table(arg[1], sep="\t", header=T)
 old_samples <- read.table(arg[2], sep="\t", header=T)
@@ -16,13 +16,16 @@ old_samples <- read.table(arg[2], sep="\t", header=T)
 #Patient selection
 #Selection of patients to do comparing the sample_info_extended with the previous version
 #Additional patients are included in the list to do according to external directions
-additional_patients <- c("D327", "D333", "H036", "H046", "H063", "H082", "H084", "H095", "H096", "H099", "H102", "H119",
-                         "H151", "H159", "H180", "H246", "H258", "H262", "H264", "H273", "H299", "H316", "H324")
+additional_patients <- c("H052", "H157", "D398", "H145", "H267")
 
 new_patients <- new_samples[!new_samples$patient %in% old_samples$patient, "patient"] %>% unique()
 sample_info <- new_samples %>% filter(patient %in% new_patients | patient %in% additional_patients)
 
 #patients already done should have their folder copied to the new location
+old_samples <- old_samples %>%  
+  filter(usable==T) %>%
+  filter(contamFilter == F) %>%
+  filter(sampleType=="fresh frozen" | sampleType=="blood") 
 patients_to_move <- data.frame(patient = unique(old_samples[!old_samples$patient %in% sample_info$patient, "patient"]))
 write_tsv(patients_to_move, "patients_to_move.tsv")
 

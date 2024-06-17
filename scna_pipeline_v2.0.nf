@@ -29,20 +29,20 @@ gc_profile = Channel.value(file(params.gc_profile))
 sample_info = Channel.value(file(params.sample_info))
 old_sample_info = Channel.value(file(params.old_sample_info))
 java = Channel.value("/usr/lib/jvm/java-11-openjdk-amd64/bin/java")
-pubDir = Channel.value(params.pubDir)
 make_input = Channel.value(file(params.make_input))
 multiploidy = Channel.value(file(params.multiploidy))
 segs_sunrises = Channel.value(file(params.segs_sunrises))
 driver_catalog = Channel.value(file(params.driver_gene_panel))
 germline_hs = Channel.value(file(params.germline_hotspots))
 somatic_hs = Channel.value(file(params.somatic_hotspots))
+pubDir = Channel.value(params.pubDir)
 
 log.info """\
 
          HMF VARIANT CALLING AND CNV ANALYSIS PIPELINE     
          ===================================
          sample_info        : ${params.sample_info}
-         ols_sample_info    : ${params.old_sample_info}
+         old_sample_info    : ${params.old_sample_info}
          pubdir             : ${params.pubDir}
          """
          .stripIndent()

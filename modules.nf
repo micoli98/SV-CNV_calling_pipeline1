@@ -35,9 +35,9 @@ process Move {
     # Read the tsv file and iterate over each patient
     while IFS= read -r patient; do
         # Check if the patient's directory exists in old_path
-        if [ -d "/mnt/storageBig8/work/micoli/SCNA_Purple/results/221105/\${patient}" ]; then
+        if [ -d "/mnt/storageBig8/work/micoli/SCNA_Purple/results/231006/\${patient}" ]; then
             # If it exists, copy the directory to the output_path
-            cp -r "/mnt/storageBig8/work/micoli/SCNA_Purple/results/221105/\${patient}" "${pubDir}/\${patient}"
+            cp -r "/mnt/storageBig8/work/micoli/SCNA_Purple/results/231006/\${patient}" "${pubDir}/\${patient}"
             # Append the patient's name to patients_moved.txt
             echo \$patient >> patients_moved.txt
         else

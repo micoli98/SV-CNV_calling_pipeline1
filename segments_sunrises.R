@@ -93,7 +93,7 @@ for (i in 1:nrow(samples_filtered)) {
     rangeDF = read.table(file = rangeFile, sep = "\t", header = T, comment.char = "!") %>%
       dplyr::select(purity, ploidy, score)
     rangePlot = purity_ploidy_range_plot(bestFitDF, rangeDF)
-    ggsave(filename = paste0(samples_filtered[i, "sample"], ".purity.range.png"), rangePlot, path = paste0("~/Desktop/surnrises"), units = "in", height = 4, width = 4.8, scale = 1)
+    ggsave(filename = paste0(samples_filtered[i, "sample"], ".purity.range.png"), rangePlot, path = paste0(publishDir, "/sunrises/"), units = "in", height = 4, width = 4.8, scale = 1)
   }
   
   file <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.somatic.hist.tsv")
