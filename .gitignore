@@ -1,3 +1,2 @@
-post_processing/.nexflow*
-post_processing/wor*
-
+# Don't track files in the post_processing since they belong to a separate pipeline
+post_processing/
