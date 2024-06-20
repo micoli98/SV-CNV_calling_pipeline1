@@ -2,3 +2,6 @@
 post_processing/
 other_scripts/
 old_version/
+
+# Remove also nextflow.config from tracking
+nextflow.config
