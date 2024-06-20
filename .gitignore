@@ -1,2 +1,4 @@
 # Don't track files in the post_processing since they belong to a separate pipeline
 post_processing/
+other_scripts/
+old_version/
