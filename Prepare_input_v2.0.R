@@ -16,7 +16,7 @@ old_samples <- read.table(arg[2], sep="\t", header=T)
 #Patient selection
 #Selection of patients to do comparing the sample_info_extended with the previous version
 #Additional patients are included in the list to do according to external directions
-additional_patients <- c("H052", "H157", "D398", "H145", "H267")
+
 
 new_patients <- new_samples[!new_samples$patient %in% old_samples$patient, "patient"] %>% unique()
 sample_info <- new_samples %>% filter(patient %in% new_patients | patient %in% additional_patients)
