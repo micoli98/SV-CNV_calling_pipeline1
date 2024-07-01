@@ -5,6 +5,7 @@ process Prepare_input {
     val make_input
     val sample_info
     val old_sample_info
+    val custom_patients
 
     output:
     path 'ids_table.tsv', emit: sample_ids 
@@ -13,7 +14,7 @@ process Prepare_input {
 
     script: 
     """
-    Rscript $make_input $sample_info $old_sample_info 
+    Rscript $make_input $sample_info $old_sample_info $custom_patients
     """
 }
 

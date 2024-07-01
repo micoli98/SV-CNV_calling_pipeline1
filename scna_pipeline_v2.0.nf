@@ -9,6 +9,9 @@ Input (mandatory):
 --sample_info: tsv file with tumor and normal labels and paths to bam files
 --old_sample_info: previous run tsv file 
 --pubDir: output directory
+
+Input (optional):
+--custom_patients: txt file with the list of manually curated patients to include in the analysis
 */
 
 projectDir = "/mnt/storageBig8/work/micoli/SCNA_Purple/src" /* Modify in favor of the location of the script*/
@@ -28,6 +31,7 @@ loci_path = Channel.value(file(params.loci_path))
 gc_profile = Channel.value(file(params.gc_profile))
 sample_info = Channel.value(file(params.sample_info))
 old_sample_info = Channel.value(file(params.old_sample_info))
+custom_patients = Channel.value(file(params.custom_patients))
 java = Channel.value("/usr/lib/jvm/java-11-openjdk-amd64/bin/java")
 make_input = Channel.value(file(params.make_input))
 multiploidy = Channel.value(file(params.multiploidy))
@@ -41,14 +45,15 @@ log.info """\
 
          HMF VARIANT CALLING AND CNV ANALYSIS PIPELINE     
          ===================================
-         sample_info        : ${params.sample_info}
-         old_sample_info    : ${params.old_sample_info}
-         pubdir             : ${params.pubDir}
+         sample_info         : ${params.sample_info}
+         old_sample_info     : ${params.old_sample_info}
+         customized_patients : ${params.custom_patients}
+         pubdir              : ${params.pubDir}
          """
          .stripIndent()
 
 workflow {
-    Prepare_input_results = Prepare_input(make_input, sample_info, old_sample_info)
+    Prepare_input_results = Prepare_input(make_input, sample_info, old_sample_info, custom_patients)
 
     Move_results = Move(pubDir, Prepare_input_results.to_move)
 

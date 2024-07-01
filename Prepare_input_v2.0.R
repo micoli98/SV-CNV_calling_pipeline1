@@ -8,7 +8,8 @@ arg <- commandArgs(trailingOnly = TRUE)
 # arg <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_test.csv"
 # proj_dir <- "/Users/micoli/mnt/storageBig8/work/micoli/051122/"
 # old_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_231004.csv"
-# new_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources//sample_info_extended_240617.csv"
+# new_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_240617.csv"
+# patients_to_add <- "~/mnt/storageBig8/work/micoli/SCNA_Purple//trial_patients.txt"
 
 new_samples <- read.table(arg[1], sep="\t", header=T)
 old_samples <- read.table(arg[2], sep="\t", header=T)
@@ -16,9 +17,9 @@ old_samples <- read.table(arg[2], sep="\t", header=T)
 #Patient selection
 #Selection of patients to do comparing the sample_info_extended with the previous version
 #Additional patients are included in the list to do according to external directions
-
-
 new_patients <- new_samples[!new_samples$patient %in% old_samples$patient, "patient"] %>% unique()
+
+additional_patients <- readLines(arg[3])
 sample_info <- new_samples %>% filter(patient %in% new_patients | patient %in% additional_patients)
 
 #patients already done should have their folder copied to the new location
