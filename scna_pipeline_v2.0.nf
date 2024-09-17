@@ -30,7 +30,7 @@ ref_genome_fa = Channel.value(params.ref_genome_fa)
 loci_path = Channel.value(file(params.loci_path))
 gc_profile = Channel.value(file(params.gc_profile))
 sample_info = Channel.value(file(params.sample_info))
-old_sample_info = Channel.value(file(params.old_sample_info))
+old_segments = Channel.value(file(params.old_segments))
 custom_patients = Channel.value(file(params.custom_patients))
 java = Channel.value("/usr/lib/jvm/java-11-openjdk-amd64/bin/java")
 make_input = Channel.value(file(params.make_input))
@@ -46,14 +46,14 @@ log.info """\
          HMF VARIANT CALLING AND CNV ANALYSIS PIPELINE     
          ===================================
          sample_info         : ${params.sample_info}
-         old_sample_info     : ${params.old_sample_info}
+         prev_segmentation   : ${params.old_segments}
          customized_patients : ${params.custom_patients}
          pubdir              : ${params.pubDir}
          """
          .stripIndent()
 
 workflow {
-    Prepare_input_results = Prepare_input(make_input, sample_info, old_sample_info, custom_patients)
+    Prepare_input_results = Prepare_input(make_input, sample_info, old_segments, custom_patients)
 
     Move_results = Move(pubDir, Prepare_input_results.to_move)
 
