@@ -4,7 +4,7 @@ process Prepare_input {
     input: 
     val make_input
     val sample_info
-    val old_sample_info
+    val old_segments
     val custom_patients
 
     output:
@@ -14,7 +14,7 @@ process Prepare_input {
 
     script: 
     """
-    Rscript $make_input $sample_info $old_sample_info $custom_patients
+    Rscript $make_input $sample_info $old_segments $custom_patients
     """
 }
 
