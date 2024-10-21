@@ -5,3 +5,14 @@ old_version/
 
 # Remove also nextflow.config from tracking
 nextflow.config
+
+# Remove logs
+*.log*
+.nextflow/
+
+# Remove trials and other pipelines
+tumor_only/
+trials/
+
+# Remove working directory
+work/
