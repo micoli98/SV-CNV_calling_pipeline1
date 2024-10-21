@@ -9,12 +9,11 @@ suppressMessages({
 
 arg <- commandArgs(trailingOnly = TRUE)
 # arg <- "~/mnt/storageBig8/work/micoli/pipeline/Common_data/sample_info_test.csv"
-# proj_dir <- "/Users/micoli/mnt/storageBig8/work/micoli/051122/"
 # old_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_231004.csv"
-# new_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_240617.csv"
-# patients_to_add <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/trial_patients.txt"
+# new_sample_info <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/sample_info_extended_241020.csv"
+# patients_to_add <- "~/mnt/storageBig8/work/micoli/SCNA_Purple/resources/add_patients_241020.tsv"
 # new_samples <- read.table(new_sample_info, sep="\t", header=T)
-# old_segmentation <- read.table("~/mnt/storageBig8/work/micoli/SCNA_Purple/results/231006/segmentation_info_final.tsv", sep="\t", header=T)
+# old_segmentation <- read.table("~/mnt/storageBig8/work/micoli/SCNA_Purple/results/240617/segmentation_info_final.tsv", sep="\t", header=T)
 
 new_samples <- read.table(arg[1], sep="\t", header=T)
 #old_samples <- read.table(arg[2], sep="\t", header=T)
@@ -42,7 +41,7 @@ added_samples <- sample_info %>%
   filter(!sample %in% old_segmentation$sample) 
 
 # Select the patients from previous selection and force to redo patients in the file
-additional_patients <- readLines(patients_to_add)
+additional_patients <- readLines(arg[3])
 final_sample_info <- sample_info %>% filter(patient %in% added_samples$patient | patient %in% additional_patients)
 
 # File for all tools
@@ -77,7 +76,9 @@ write_tsv(gridss_input, "gridss_input.tsv", na = "")
 patients_to_move <- old_segmentation %>% 
   filter(!patient %in% gridss_input$patient) %>%
   pull(patient) %>%
-  unique()
+  unique() %>% 
+  as.data.frame() 
+colnames(patients_to_move) <- "patient"
 
 write_tsv(patients_to_move, "patients_to_move.tsv")
 

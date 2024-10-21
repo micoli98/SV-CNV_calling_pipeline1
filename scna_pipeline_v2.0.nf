@@ -39,6 +39,7 @@ segs_sunrises = Channel.value(file(params.segs_sunrises))
 driver_catalog = Channel.value(file(params.driver_gene_panel))
 germline_hs = Channel.value(file(params.germline_hotspots))
 somatic_hs = Channel.value(file(params.somatic_hotspots))
+fusion_hotsposts = Channel.value(file(params.fusions))
 pubDir = Channel.value(params.pubDir)
 
 log.info """\
@@ -54,9 +55,7 @@ log.info """\
 
 workflow {
     Prepare_input_results = Prepare_input(make_input, sample_info, old_segments, custom_patients)
-
-    Move_results = Move(pubDir, Prepare_input_results.to_move)
-
+    
     gridss_input = Prepare_input_results.gridss_ids
         .splitCsv(sep:'\t', header: true)
         .map{ row-> tuple(row.normalSample, row.patient, row.bams)}
@@ -74,7 +73,7 @@ workflow {
     
     gripss_input = sample_info_split.combine(Gridss_results.gridss_output, by:1)
 
-    Gripss_results = Gripss(java, pubDir, ref_genome_fa, pon_breakend, pon_breakpoint, gripss_input)
+    Gripss_results = Gripss(java, pubDir, ref_genome_fa, pon_breakend, pon_breakpoint, fusion_hotsposts, gripss_input)
 
     Cobalt_results = Cobalt(java, ref_genome_fa, gc_profile, pubDir, sample_info_split)
 
@@ -91,7 +90,9 @@ workflow {
     purple_for_analysis = Purple_results.purple_results_ch
         .collect()
         .unique()
-    
+
+    Move_results = Move(pubDir, Prepare_input_results.to_move, purple_for_analysis)
+
     Final_results = Results(pubDir, sample_info, segs_sunrises, purple_for_analysis, Move_results)
 
     Multiploidy_results = Multiploidy(sample_info, multiploidy, pubDir, purple_for_analysis, Move_results)

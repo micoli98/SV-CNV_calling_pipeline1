@@ -18,43 +18,10 @@ process Prepare_input {
     """
 }
 
-process Move {
-    cache = true
-
-    input:
-    val pubDir
-    path patients_to_move
-
-    output:
-    path 'patients_moved.txt', emit: move_confirm
-
-    script:
-    """
-    # Create or empty the output file
-    > patients_moved.txt
-
-    # Read the tsv file and iterate over each patient
-    while IFS= read -r patient; do
-        # Check if the patient's directory exists in old_path
-        if [ -d "/mnt/storageBig8/work/micoli/SCNA_Purple/results/231006/\${patient}" ]; then
-            # If it exists, copy the directory to the output_path
-            cp -r "/mnt/storageBig8/work/micoli/SCNA_Purple/results/231006/\${patient}" "${pubDir}/\${patient}"
-            # Append the patient's name to patients_moved.txt
-            echo \$patient >> patients_moved.txt
-        else
-            # Print a warning if the directory does not exist
-            echo "Warning: Directory for patient \${patient} not found."
-        fi
-    done < <(tail -n +2 ${patients_to_move}) # This will skip the header of the tsv file
-
-    """ 
-}
-
 process Gridss {
-    cpus 8
+    cpus 10
     memory '32 GB'
     cache true
-    queueSize = 10
     publishDir "$pubDir/${patient}", mode: "copy"
 
     input:
@@ -77,6 +44,8 @@ process Gridss {
     -j  /opt/share/gridss-2.13.2/gridss-2.13.2-gridss-jar-with-dependencies.jar \
     -o ${normalSample}_calls.vcf \
     -b $bk_bed \
+    -t 8 \
+    --skipsoftcliprealignment \
     ${bams}
 
     #copy in PoN directory
@@ -138,6 +107,7 @@ process Gripss {
     val ref_genome_fa
     path pon_breakend
     path pon_breakpoint 
+    val fusion_hotsposts
     tuple val(normalSample), val(sample), val(bamFile), val(normalBamFile), val(patient), path("${normalSample}_calls.vcf")
 
     output:
@@ -150,19 +120,21 @@ process Gripss {
     
     script:
     """
-    $java -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/gripss.jar \
+    $java -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/gripss_v2.3.4.jar \
         -sample  ${sample}\
         -reference ${normalSample} \
         -ref_genome $ref_genome_fa \
+        -ref_genome_version 38 \
         -pon_sgl_file gridss_pon_single_breakend.bed \
         -pon_sv_file gridss_pon_breakpoint.bedpe \
+        -known_hotspot_file $fusion_hotsposts \
         -vcf $pubDir/${patient}/${normalSample}_calls.vcf.gz \
         -output_dir .
     """
 }
 
 process Cobalt {
-    cpus 2
+    cpus 4
     memory '8 GB'
     cache true
     publishDir "$pubDir/${patient}", mode: "copy"
@@ -179,7 +151,7 @@ process Cobalt {
 
     script:
     """
-    $java -Xmx8g -cp /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/cobalt.jar com.hartwig.hmftools.cobalt.CobaltApplication \
+    $java -Xmx8g -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/cobalt-1.14.1.jar \
     -reference ${normalSample} \
     -reference_bam ${normalBamFile} \
     -tumor ${sample} \
@@ -192,8 +164,8 @@ process Cobalt {
 }
 
 process Amber {
-    cpus 2
-    memory '32 GB'
+    cpus 4
+    memory '8 GB'
     cache true
     publishDir "$pubDir/${patient}", mode: "copy"
 
@@ -208,7 +180,7 @@ process Amber {
 
     script:
     """
-    $java -Xmx32g -cp /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/amber.jar com.hartwig.hmftools.amber.AmberApplication \
+    $java -Xmx32g -cp /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/amber-3.9.jar com.hartwig.hmftools.amber.AmberApplication \
     -reference ${normalSample} \
     -reference_bam ${normalBamFile} \
     -tumor ${sample} \
@@ -255,7 +227,7 @@ process Purple {
     -gc_profile $gc_profile \
     -ref_genome $ref_genome_fa \
     -ensembl_data_dir $ensembl_dir \
-    -structural_vcf ${sample}.gripss.filtered.vcf.gz \
+    -somatic_sv_vcf ${sample}.gripss.filtered.vcf.gz \
     -sv_recovery_vcf ${sample}.gripss.vcf.gz \
     -germline_vcf $germline_data/${patient}.vcf.gz \
     -somatic_vcf $somatic_data/${patient}.vcf.gz \
@@ -301,4 +273,37 @@ process Multiploidy {
     """
     Rscript $multiploidy $sample_info $pubDir
     """
+}
+
+process Move {
+    cache = true
+
+    input:
+    val pubDir
+    path patients_to_move
+    path ("*.purple.{purity|purity.range|somatic.hist|somatic.clonality|cnv.somatic}.tsv") 
+
+    output:
+    path 'patients_moved.txt', emit: move_confirm
+
+    script:
+    """
+    # Create or empty the output file
+    > patients_moved.txt
+
+    # Read the tsv file and iterate over each patient
+    while IFS= read -r patient; do
+        # Check if the patient's directory exists in old_path
+        if [ -d "/mnt/storageBig8/work/micoli/SCNA_Purple/results/240617/\${patient}" ]; then
+            # If it exists, copy the directory to the output_path
+            cp -r "/mnt/storageBig8/work/micoli/SCNA_Purple/results/240617/\${patient}" "${pubDir}/"
+            # Append the patient's name to patients_moved.txt
+            echo \$patient >> patients_moved.txt
+        else
+            # Print a warning if the directory does not exist
+            echo "Warning: Directory for patient \${patient} not found."
+        fi
+    done < <(tail -n +2 ${patients_to_move}) # This will skip the header of the tsv file
+
+    """ 
 }
