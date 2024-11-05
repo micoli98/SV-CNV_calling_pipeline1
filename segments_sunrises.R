@@ -41,16 +41,25 @@ samples_filtered <- samples_filtered %>%
 
 # Retrieve purity and ploidy values from purple results
 for (i in 1:nrow(samples_filtered)) {
+  sec_opt <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/purple2/", samples_filtered[i, "sample"], ".purple.purity.tsv")
   file <- paste0(publishDir, "/", samples_filtered[i, "patient"], "/", samples_filtered[i, "sample"], ".purple.purity.tsv")
-  if (file.exists(file)) {
-    pur_pl <-read.table(file, sep="\t", header=T)
-    samples_filtered[i, "ploidy"] <- pur_pl[1, "ploidy"]
-    samples_filtered[i, "non_curated_purity"] <- pur_pl[1, "purity"]
-    
-    #Add checking of aberrancy using the purity-range method with a threshold of 0.5
-    samples_filtered[i, "aberrant"] <- ifelse(pur_pl$maxPurity - pur_pl$minPurity <= 0.5, T, F)
+  
+  if(file.exists(sec_opt))
+  {
+    pur_pl <- read.table(sec_opt, sep="\t", header=T)
+  } else if (file.exists(file)) {
+    pur_pl <- read.table(file, sep="\t", header=T)
+  } else {
+    next
   }
+
+  samples_filtered[i, "ploidy"] <- pur_pl[1, "ploidy"]
+  samples_filtered[i, "non_curated_purity"] <- pur_pl[1, "purity"]
+  samples_filtered[i, "aberrant"] <- ifelse(pur_pl[1, "status"] == "NORMAL", T, F)
+  samples_filtered[i, "WGD"] <- pur_pl[1, "wholeGenomeDuplication"]
 }
+write_tsv(samples_filtered, file.path(publishDir, "purity_ploidy_estimates.tsv"))
+
 # Check for completed samples (not necessary)
 # samples_filtered <- samples_filtered %>% mutate(sum = rowSums(.[3:4]))
 # samplesReady <- subset(samples_filtered, sum!=0)
@@ -58,9 +67,13 @@ for (i in 1:nrow(samples_filtered)) {
 # Join all segments retrieved from PURPLE results
 # Create a function to read and add sample and patient columns
 read_and_annotate <- function(sample, patient, publishDir) {
-  file <- paste0(publishDir, "/", patient, "/", sample, ".purple.cnv.somatic.tsv")
-  if (file.exists(file)) {
-    df <- read_tsv(file, show_col_types = FALSE) %>%
+  file1 <- paste0(publishDir, "/", patient, "/", sample, ".purple.cnv.somatic.tsv")
+  file2 <- paste0(publishDir, "/", patient, "/purple2/", sample, ".purple.cnv.somatic.tsv")
+  if(file.exists(file2)) {
+    df <- read_tsv(file2, show_col_types = FALSE) %>%
+      mutate(sample = sample, patient = patient)
+  } else if (file.exists(file1)) {
+    df <- read_tsv(file1, show_col_types = FALSE) %>%
       mutate(sample = sample, patient = patient)
     return(df)
   } else {
@@ -79,7 +92,7 @@ all_segs <- all_segs %>%
          Loh = abs(baf - 0.5) * 2,
          purity = ifelse(aberrant == T, non_curated_purity, 0.08)) #purity correction for non-aberrant samples
 
-all_segs <- all_segs %>% dplyr::select(sample, patient, 1:16, "ploidy", "purity", 20:23)
+all_segs <- all_segs %>% dplyr::select(sample, patient, 1:16, 23:24)
 
 write_tsv(all_segs, paste0(publishDir, "/segmentation_info_final.tsv"))
 

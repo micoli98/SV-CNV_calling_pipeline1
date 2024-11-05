@@ -68,6 +68,7 @@ process Gridss {
 
 process Pon {
     publishDir "$pubDir", mode: "copy"
+    cache true
 
     input:  
     val pon_breakend
@@ -97,7 +98,7 @@ process Pon {
 
 process Gripss {
     cpus 4
-    memory '8 GB'
+    memory '16 GB'
     cache true
     publishDir "$pubDir/${patient}", mode: "copy"
 
@@ -105,8 +106,8 @@ process Gripss {
     val java
     val pubDir
     val ref_genome_fa
-    path pon_breakend
-    path pon_breakpoint 
+    path "gridss_pon_single_breakend.bed"
+    path "gridss_pon_breakpoint.bedpe" 
     val fusion_hotsposts
     tuple val(normalSample), val(sample), val(bamFile), val(normalBamFile), val(patient), path("${normalSample}_calls.vcf")
 
@@ -120,7 +121,7 @@ process Gripss {
     
     script:
     """
-    $java -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/gripss_v2.3.4.jar \
+    $java -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/old/gripss.jar \
         -sample  ${sample}\
         -reference ${normalSample} \
         -ref_genome $ref_genome_fa \
@@ -128,7 +129,7 @@ process Gripss {
         -pon_sgl_file gridss_pon_single_breakend.bed \
         -pon_sv_file gridss_pon_breakpoint.bedpe \
         -known_hotspot_file $fusion_hotsposts \
-        -vcf $pubDir/${patient}/${normalSample}_calls.vcf.gz \
+        -vcf $pubDir/${patient}/${normalSample}_calls.vcf \
         -output_dir .
     """
 }
@@ -219,7 +220,12 @@ process Purple {
 
     script:
     """
-    $java -Xmx32g -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/purple_v3.7.2.jar \
+    # Modify vcf removing M chromosome
+    bcftools view -r ^chrM $somatic_data/${patient}.vcf.gz -o ${patient}_noM.vcf
+    bgzip -c ${patient}_noM.vcf > ${patient}_noM.vcf.gz
+    bcftools index --tbi ${patient}_noM.vcf.gz
+    
+    $java -Xmx32g -jar /mnt/storageBig8/work/micoli/SCNA_Purple/resources/dependencies/old/purple_v3.7.2.jar \
     -reference ${normalSample} \
     -tumor ${sample} \
     -amber ${patient} \
@@ -227,11 +233,9 @@ process Purple {
     -gc_profile $gc_profile \
     -ref_genome $ref_genome_fa \
     -ensembl_data_dir $ensembl_dir \
-    -somatic_sv_vcf ${sample}.gripss.filtered.vcf.gz \
+    -structural_vcf ${sample}.gripss.filtered.vcf.gz \
     -sv_recovery_vcf ${sample}.gripss.vcf.gz \
-    -germline_vcf $germline_data/${patient}.vcf.gz \
-    -somatic_vcf $somatic_data/${patient}.vcf.gz \
-    -run_drivers \
+    -somatic_vcf ${patient}_noM.vcf.gz \
     -driver_gene_panel $driver_catalog \
     -somatic_hotspots $somatic_hs \
     -germline_hotspots $germline_hs \
@@ -277,6 +281,7 @@ process Multiploidy {
 
 process Move {
     cache = true
+    cpus 20
 
     input:
     val pubDir

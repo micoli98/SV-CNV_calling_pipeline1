@@ -73,7 +73,7 @@ workflow {
     
     gripss_input = sample_info_split.combine(Gridss_results.gridss_output, by:1)
 
-    Gripss_results = Gripss(java, pubDir, ref_genome_fa, pon_breakend, pon_breakpoint, fusion_hotsposts, gripss_input)
+    Gripss_results = Gripss(java, pubDir, ref_genome_fa, Pon_results.pon_bed, Pon_results.pon_bedpe, fusion_hotsposts, gripss_input)
 
     Cobalt_results = Cobalt(java, ref_genome_fa, gc_profile, pubDir, sample_info_split)
 
